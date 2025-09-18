@@ -1,0 +1,62 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: puser
+      POSTGRES_PASSWORD: ppass
+      POSTGRES_DB: packets
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD","pg_isready","-U","puser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build: ./gateway
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/packets
+      - SPRING_DATASOURCE_USERNAME=puser
+      - SPRING_DATASOURCE_PASSWORD=ppass
+
+  capture-service:
+    build: ./capture-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - gateway
+    # for live capture on Linux you may want:
+    # network_mode: host
+    # cap_add: ["NET_ADMIN","NET_RAW"]
+
+  parser-service:
+    build: ./parser-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - gateway
+
+  classifier-service:
+    build: ./classifier-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - gateway
+
+  ui:
+    build: ./ui
+    ports:
+      - "5173:5173"
+    depends_on:
+      - gateway
+
+volumes:
+  pgdata:
